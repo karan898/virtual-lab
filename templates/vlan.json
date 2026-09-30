@@ -1,0 +1,91 @@
+{
+  "name": "vlan",
+  "description": "1 OVS switch (netdev datapath), 4 hosts, 2 VLANs (10 and 20). Hosts in different VLANs cannot ping each other.",
+  "routers": [],
+  "hosts": [
+    {
+      "name": "h1",
+      "ip": "192.168.10.1/24",
+      "gateway": "",
+      "comment": "VLAN 10"
+    },
+    {
+      "name": "h2",
+      "ip": "192.168.10.2/24",
+      "gateway": "",
+      "comment": "VLAN 10"
+    },
+    {
+      "name": "h3",
+      "ip": "192.168.20.1/24",
+      "gateway": "",
+      "comment": "VLAN 20"
+    },
+    {
+      "name": "h4",
+      "ip": "192.168.20.2/24",
+      "gateway": "",
+      "comment": "VLAN 20"
+    }
+  ],
+  "links": [],
+  "bridges": [
+    {
+      "name": "sw1",
+      "datapath": "netdev",
+      "comment": "OVS switch using userspace netdev datapath (WSL2 — no kernel module)",
+      "ports": [
+        { "ns": "h1", "ip": "192.168.10.1/24", "vlan": "10" },
+        { "ns": "h2", "ip": "192.168.10.2/24", "vlan": "10" },
+        { "ns": "h3", "ip": "192.168.20.1/24", "vlan": "20" },
+        { "ns": "h4", "ip": "192.168.20.2/24", "vlan": "20" }
+      ]
+    }
+  ],
+  "frr_configs": {},
+  "grading_checks": [
+    {
+      "id": "ping_h1_to_h2_same_vlan",
+      "description": "h1 can ping h2 (same VLAN 10)",
+      "type": "ping",
+      "from_ns": "h1",
+      "target_ip": "192.168.10.2",
+      "count": 3,
+      "expect_success": true
+    },
+    {
+      "id": "ping_h3_to_h4_same_vlan",
+      "description": "h3 can ping h4 (same VLAN 20)",
+      "type": "ping",
+      "from_ns": "h3",
+      "target_ip": "192.168.20.2",
+      "count": 3,
+      "expect_success": true
+    },
+    {
+      "id": "ping_h1_to_h3_cross_vlan_blocked",
+      "description": "h1 CANNOT ping h3 (cross-VLAN isolation)",
+      "type": "ping",
+      "from_ns": "h1",
+      "target_ip": "192.168.20.1",
+      "count": 3,
+      "expect_success": false
+    },
+    {
+      "id": "ping_h2_to_h4_cross_vlan_blocked",
+      "description": "h2 CANNOT ping h4 (cross-VLAN isolation)",
+      "type": "ping",
+      "from_ns": "h2",
+      "target_ip": "192.168.20.2",
+      "count": 3,
+      "expect_success": false
+    },
+    {
+      "id": "ovs_vlan_config",
+      "description": "OVS bridge sw1 has VLAN tags configured",
+      "type": "ovs_check",
+      "command": "ovs-vsctl show",
+      "expect_contains": "tag: 10"
+    }
+  ]
+}

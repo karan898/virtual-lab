@@ -1,0 +1,28 @@
+[bench] Config: students=5 base=http://localhost:4000 template=ospf poll=2000ms timeout=150000ms
+[bench] Ensuring 5 student accounts...
+[bench] Heap before: 30 MiB
+[bench] Launching 5 concurrent students...
+[bench] Heap after:  30 MiB
+
+══════════════════════════════════════════════════════════
+ BENCHMARK COMPLETE — 0/5 students succeeded
+══════════════════════════════════════════════════════════
+  Wall clock (all 5 concurrent): 1.4s
+
+  login: no data
+  provision: no data
+  grade: no data
+  ws_rtt: no data
+  destroy: no data
+
+  Grading: 0/0 scored 4/4.  avg_score=null
+  Backend heap: 30 MiB → 30 MiB
+
+  ERRORS (5):
+    student1: Lab creation failed: {"error":"Too many lab creation requests, please try again after 10 minutes"}
+    student2: Lab creation failed: {"error":"Too many lab creation requests, please try again after 10 minutes"}
+    student3: Lab creation failed: {"error":"Too many lab creation requests, please try again after 10 minutes"}
+    student4: Login failed: {"error":"Too many login attempts, please try again after 15 minutes"}
+    student5: Login failed: {"error":"Too many login attempts, please try again after 15 minutes"}
+══════════════════════════════════════════════════════════
+

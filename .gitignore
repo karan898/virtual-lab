@@ -1,0 +1,35 @@
+# Virtual Networking Lab — .gitignore
+
+# Secrets
+.env
+!.env.example
+
+# Node.js
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Frontend build
+frontend/dist/
+
+# Benchmark results (keep raw, exclude interim)
+bench/results/*.csv
+bench/results/*.log
+!bench/results/.gitkeep
+
+# Docker / Kubernetes
+*.kubeconfig
+*.pem
+*.key
+*.crt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log

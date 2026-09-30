@@ -1,0 +1,14 @@
+{
+  "name": "netlab-benchmark",
+  "version": "1.0.0",
+  "description": "Load-test client for netlab virtual networking laboratory",
+  "main": "benchmark.js",
+  "type": "commonjs",
+  "scripts": {
+    "bench": "node benchmark.js"
+  },
+  "dependencies": {
+    "ws": "8.17.1",
+    "axios": "1.7.2"
+  }
+}

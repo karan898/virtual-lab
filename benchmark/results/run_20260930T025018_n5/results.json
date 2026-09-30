@@ -1,0 +1,165 @@
+{
+  "config": {
+    "students": 5,
+    "template": "ospf",
+    "base_url": "http://localhost:4000",
+    "poll_interval_ms": 2000,
+    "timeout_ms": 150000,
+    "timestamp": "2026-09-30T02:50:23.400Z"
+  },
+  "totals": {
+    "wall_clock_ms": 1410,
+    "successful": 0,
+    "failed": 5
+  },
+  "latency_ms": {
+    "login": {
+      "n": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "provision": {
+      "n": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "grade": {
+      "n": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "ws_rtt": {
+      "n": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    },
+    "destroy": {
+      "n": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "p50": null,
+      "p90": null,
+      "p95": null,
+      "p99": null
+    }
+  },
+  "grading": {
+    "results": [],
+    "perfect_4_4": 0,
+    "avg_score": null
+  },
+  "memory": {
+    "backend_heap_before_mb": 30,
+    "backend_heap_after_mb": 30
+  },
+  "errors": [
+    {
+      "student": 1,
+      "error": "Lab creation failed: {\"error\":\"Too many lab creation requests, please try again after 10 minutes\"}"
+    },
+    {
+      "student": 2,
+      "error": "Lab creation failed: {\"error\":\"Too many lab creation requests, please try again after 10 minutes\"}"
+    },
+    {
+      "student": 3,
+      "error": "Lab creation failed: {\"error\":\"Too many lab creation requests, please try again after 10 minutes\"}"
+    },
+    {
+      "student": 4,
+      "error": "Login failed: {\"error\":\"Too many login attempts, please try again after 15 minutes\"}"
+    },
+    {
+      "student": 5,
+      "error": "Login failed: {\"error\":\"Too many login attempts, please try again after 15 minutes\"}"
+    }
+  ],
+  "raw": [
+    {
+      "student": 1,
+      "username": "bench_student_1",
+      "login_ms": 366,
+      "provision_ms": null,
+      "poll_attempts": null,
+      "grade_ms": null,
+      "grade_score": null,
+      "grade_max": null,
+      "ws_rtt_ms": null,
+      "destroy_ms": null,
+      "error": "Lab creation failed: {\"error\":\"Too many lab creation requests, please try again after 10 minutes\"}"
+    },
+    {
+      "student": 2,
+      "username": "bench_student_2",
+      "login_ms": 389,
+      "provision_ms": null,
+      "poll_attempts": null,
+      "grade_ms": null,
+      "grade_score": null,
+      "grade_max": null,
+      "ws_rtt_ms": null,
+      "destroy_ms": null,
+      "error": "Lab creation failed: {\"error\":\"Too many lab creation requests, please try again after 10 minutes\"}"
+    },
+    {
+      "student": 3,
+      "username": "bench_student_3",
+      "login_ms": 380,
+      "provision_ms": null,
+      "poll_attempts": null,
+      "grade_ms": null,
+      "grade_score": null,
+      "grade_max": null,
+      "ws_rtt_ms": null,
+      "destroy_ms": null,
+      "error": "Lab creation failed: {\"error\":\"Too many lab creation requests, please try again after 10 minutes\"}"
+    },
+    {
+      "student": 4,
+      "username": "bench_student_4",
+      "login_ms": 30,
+      "provision_ms": null,
+      "poll_attempts": null,
+      "grade_ms": null,
+      "grade_score": null,
+      "grade_max": null,
+      "ws_rtt_ms": null,
+      "destroy_ms": null,
+      "error": "Login failed: {\"error\":\"Too many login attempts, please try again after 15 minutes\"}"
+    },
+    {
+      "student": 5,
+      "username": "bench_student_5",
+      "login_ms": 26,
+      "provision_ms": null,
+      "poll_attempts": null,
+      "grade_ms": null,
+      "grade_score": null,
+      "grade_max": null,
+      "ws_rtt_ms": null,
+      "destroy_ms": null,
+      "error": "Login failed: {\"error\":\"Too many login attempts, please try again after 15 minutes\"}"
+    }
+  ]
+}

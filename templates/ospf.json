@@ -1,0 +1,91 @@
+{
+  "name": "ospf",
+  "description": "3 routers in a triangle with OSPF, 2 hosts on separate routers",
+  "routers": [
+    { "name": "r1", "loopback": "10.0.0.1/32" },
+    { "name": "r2", "loopback": "10.0.0.2/32" },
+    { "name": "r3", "loopback": "10.0.0.3/32" }
+  ],
+  "hosts": [
+    {
+      "name": "h1",
+      "ip": "192.168.1.2/24",
+      "gateway": "192.168.1.1",
+      "comment": "Connected to r1's LAN side"
+    },
+    {
+      "name": "h2",
+      "ip": "192.168.3.2/24",
+      "gateway": "192.168.3.1",
+      "comment": "Connected to r3's LAN side"
+    }
+  ],
+  "links": [
+    {
+      "comment": "r1 <-> r2 (triangle edge)",
+      "a": "r1", "b": "r2",
+      "a_ip": "10.1.12.1/30", "b_ip": "10.1.12.2/30"
+    },
+    {
+      "comment": "r2 <-> r3 (triangle edge)",
+      "a": "r2", "b": "r3",
+      "a_ip": "10.1.23.1/30", "b_ip": "10.1.23.2/30"
+    },
+    {
+      "comment": "r1 <-> r3 (triangle edge)",
+      "a": "r1", "b": "r3",
+      "a_ip": "10.1.13.1/30", "b_ip": "10.1.13.2/30"
+    },
+    {
+      "comment": "r1 LAN to h1",
+      "a": "r1", "b": "h1",
+      "a_ip": "192.168.1.1/24", "b_ip": "192.168.1.2/24"
+    },
+    {
+      "comment": "r3 LAN to h2",
+      "a": "r3", "b": "h2",
+      "a_ip": "192.168.3.1/24", "b_ip": "192.168.3.2/24"
+    }
+  ],
+  "bridges": [],
+  "frr_configs": {
+    "r1": "!\ninterface r1-r2 \n ip ospf area 0\n ip ospf network point-to-point\n!\ninterface r1-r3\n ip ospf area 0\n ip ospf network point-to-point\n!\ninterface r1-h1\n ip ospf area 0\n ip ospf network point-to-point\n!\ninterface lo\n ip ospf area 0\n!\nrouter ospf\n ospf router-id 10.0.0.1\n network 10.0.0.1/32 area 0\n network 10.1.12.0/30 area 0\n network 10.1.13.0/30 area 0\n network 192.168.1.0/24 area 0\n!",
+    "r2": "!\ninterface r2-r1\n ip ospf area 0\n ip ospf network point-to-point\n!\ninterface r2-r3\n ip ospf area 0\n ip ospf network point-to-point\n!\ninterface lo\n ip ospf area 0\n!\nrouter ospf\n ospf router-id 10.0.0.2\n network 10.0.0.2/32 area 0\n network 10.1.12.0/30 area 0\n network 10.1.23.0/30 area 0\n!",
+    "r3": "!\ninterface r3-r1\n ip ospf area 0\n ip ospf network point-to-point\n!\ninterface r3-r2\n ip ospf area 0\n ip ospf network point-to-point\n!\ninterface r3-h2\n ip ospf area 0\n ip ospf network point-to-point\n!\ninterface lo\n ip ospf area 0\n!\nrouter ospf\n ospf router-id 10.0.0.3\n network 10.0.0.3/32 area 0\n network 10.1.13.0/30 area 0\n network 10.1.23.0/30 area 0\n network 192.168.3.0/24 area 0\n!"
+  },
+  "grading_checks": [
+    {
+      "id": "ospf_full_r1_r2",
+      "description": "OSPF neighbor r1-r2 is Full",
+      "type": "vtysh",
+      "router": "r1",
+      "command": "show ip ospf neighbor",
+      "expect_contains": "Full"
+    },
+    {
+      "id": "ospf_full_r2_r3",
+      "description": "OSPF neighbor r2-r3 is Full",
+      "type": "vtysh",
+      "router": "r2",
+      "command": "show ip ospf neighbor",
+      "expect_contains": "Full"
+    },
+    {
+      "id": "ping_h1_to_h2",
+      "description": "h1 can ping h2 (end-to-end reachability)",
+      "type": "ping",
+      "from_ns": "h1",
+      "target_ip": "192.168.3.2",
+      "count": 3,
+      "expect_success": true
+    },
+    {
+      "id": "route_r1_has_192_168_3",
+      "description": "r1 routing table contains 192.168.3.0/24 via OSPF",
+      "type": "vtysh",
+      "router": "r1",
+      "command": "show ip route ospf",
+      "expect_contains": "192.168.3.0/24"
+    }
+  ]
+}

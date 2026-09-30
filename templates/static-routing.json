@@ -1,0 +1,78 @@
+{
+  "name": "static-routing",
+  "description": "2 routers with static routes, 2 hosts on separate subnets",
+  "routers": [
+    { "name": "r1", "loopback": "10.0.0.1/32" },
+    { "name": "r2", "loopback": "10.0.0.2/32" }
+  ],
+  "hosts": [
+    {
+      "name": "h1",
+      "ip": "192.168.1.2/24",
+      "gateway": "192.168.1.1"
+    },
+    {
+      "name": "h2",
+      "ip": "192.168.2.2/24",
+      "gateway": "192.168.2.1"
+    }
+  ],
+  "links": [
+    {
+      "comment": "r1 <-> r2 transit link",
+      "a": "r1", "b": "r2",
+      "a_ip": "10.1.12.1/30", "b_ip": "10.1.12.2/30"
+    },
+    {
+      "comment": "r1 LAN",
+      "a": "r1", "b": "h1",
+      "a_ip": "192.168.1.1/24", "b_ip": "192.168.1.2/24"
+    },
+    {
+      "comment": "r2 LAN",
+      "a": "r2", "b": "h2",
+      "a_ip": "192.168.2.1/24", "b_ip": "192.168.2.2/24"
+    }
+  ],
+  "bridges": [],
+  "frr_configs": {
+    "r1": "!\nip route 192.168.2.0/24 10.1.12.2\nip route 10.0.0.2/32 10.1.12.2\n!",
+    "r2": "!\nip route 192.168.1.0/24 10.1.12.1\nip route 10.0.0.1/32 10.1.12.1\n!"
+  },
+  "grading_checks": [
+    {
+      "id": "ping_h1_to_h2",
+      "description": "h1 can ping h2",
+      "type": "ping",
+      "from_ns": "h1",
+      "target_ip": "192.168.2.2",
+      "count": 3,
+      "expect_success": true
+    },
+    {
+      "id": "ping_h2_to_h1",
+      "description": "h2 can ping h1",
+      "type": "ping",
+      "from_ns": "h2",
+      "target_ip": "192.168.1.2",
+      "count": 3,
+      "expect_success": true
+    },
+    {
+      "id": "route_r1_has_192_168_2",
+      "description": "r1 has static route to 192.168.2.0/24",
+      "type": "vtysh",
+      "router": "r1",
+      "command": "show ip route static",
+      "expect_contains": "192.168.2.0/24"
+    },
+    {
+      "id": "route_r2_has_192_168_1",
+      "description": "r2 has static route to 192.168.1.0/24",
+      "type": "vtysh",
+      "router": "r2",
+      "command": "show ip route static",
+      "expect_contains": "192.168.1.0/24"
+    }
+  ]
+}

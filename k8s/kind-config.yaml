@@ -1,0 +1,56 @@
+# kind-config.yaml — Single-node kind cluster configuration
+# This creates a minimal kind cluster suitable for running lab pods.
+#
+# Key decisions:
+# - Single control-plane node (no workers) to conserve RAM
+# - extraMounts: host templates directory mounted into kind node
+#   so lab pods can access topology JSON files via hostPath volumes
+# - Port 6443 (API server) is not directly exposed to Windows host;
+#   the backend accesses it via Docker internal networking
+# - Pod security: we use privileged=true on lab pods (documented in DEVIATIONS.md)
+#   kind's default podSecurity settings must allow this
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+name: netlab
+
+nodes:
+  - role: control-plane
+    # Pin exact Kubernetes version (matches kubectl 1.30.2)
+    image: kindest/node:v1.30.2
+    
+    # Resource limits for the kind node (enforced via Docker)
+    # This is not a standard kind field — set via Docker's --memory flag
+    # Instead we limit through resource quotas on namespaces
+    
+    # Mount templates into kind node for hostPath volumes
+    extraMounts:
+      - hostPath: /mnt/d/Research_Paper/model/templates
+        containerPath: /lab-templates
+        readOnly: true
+    
+    # Expose kind's kubeconfig API port (internal Docker networking only)
+    # Backend connects via Docker network, not via NodePort
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+          extraArgs:
+            # Increase request timeout for lab provisioning
+            request-timeout: "60s"
+
+# Networking configuration
+networking:
+  # Use a non-overlapping pod CIDR to avoid conflicts with lab topology IPs
+  # Lab topologies use 10.0.0.0/8 and 192.168.0.0/16 internally
+  # Kind pods use 172.20.0.0/16 (avoiding conflict)
+  podSubnet: "172.20.0.0/16"
+  serviceSubnet: "172.21.0.0/16"
+  # Disable default CNI — we install our own (Flannel) for control
+  # Actually keep default (kindnet) to stay simple; it does not conflict
+  # with lab topology namespaces which are inside the lab pod, not K8s pods
+  disableDefaultCNI: false
+
+# Feature gates (none needed for MVP)
+featureGates: {}
