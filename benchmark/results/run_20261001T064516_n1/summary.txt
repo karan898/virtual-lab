@@ -1,0 +1,4 @@
+[bench] Config: students=1 base=http://localhost:4000 template=ospf poll=2000ms timeout=150000ms req_timeout=20000ms
+[bench] Ensuring 1 student accounts...
+[bench] Heap before: 33 MiB
+[bench] Launching 1 concurrent students... (each capped at 210s)

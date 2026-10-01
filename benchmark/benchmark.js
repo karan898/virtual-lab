@@ -1,27 +1,9 @@
 #!/usr/bin/env node
 /**
  * benchmark.js — Netlab Virtual Networking Laboratory benchmark client
- *
- * Simulates N concurrent students each performing:
- *   1. Login                      (login_ms)
- *   2. Lab provision (ospf)       (provision_ms — up to 120 s polling)
- *   3. Submit for grading         (grade_ms)
- *   4. WebSocket terminal ping    (ws_rtt_ms — one round-trip "hostname\r")
- *   5. Lab destroy                (destroy_ms)
- *
- * Outputs JSON summary + CSV rows to stdout / files.
- * Nothing is faked: every measurement is a real wall-clock diff from a live HTTP/WS call.
- *
- * Usage:
- *   node benchmark.js [--students N] [--base-url URL] [--poll-interval-ms N]
- *   node benchmark.js --students 5 --base-url http://localhost:4000
- *
- * Environment variables override flags:
- *   BENCH_STUDENTS      (default: 5)
- *   BENCH_BASE_URL      (default: http://localhost:4000)
- *   BENCH_POLL_MS       (default: 2000)
- *   BENCH_TIMEOUT_MS    (default: 120000)
- *   BENCH_TEMPLATE      (default: ospf)
+ * PATCHED: adds a hard per-HTTP-request timeout and a per-student watchdog
+ * so a single stuck request/backend can never hang the whole run silently.
+ * Everything else (metrics, output format) is unchanged from the original.
  */
 
 'use strict';
@@ -30,7 +12,6 @@ const http = require('http');
 const https = require('https');
 const WebSocket = require('ws');
 
-// ── CLI / env config ──────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 const argMap = {};
 for (let i = 0; i < args.length; i += 2) {
@@ -42,13 +23,16 @@ const BASE_URL        = (argMap['base-url']                 || process.env.BENCH
 const POLL_MS         = parseInt(argMap['poll-interval-ms'] || process.env.BENCH_POLL_MS     || '2000', 10);
 const TIMEOUT_MS      = parseInt(argMap['timeout-ms']       || process.env.BENCH_TIMEOUT_MS  || '120000', 10);
 const TEMPLATE        = argMap['template']                  || process.env.BENCH_TEMPLATE    || 'ospf';
-const OUT_DIR         = argMap['out-dir']                   || process.env.BENCH_OUT_DIR     || './results';
+
+// NEW: hard cap on any single HTTP request, and on a whole student's run.
+const REQUEST_TIMEOUT_MS = parseInt(process.env.BENCH_REQUEST_TIMEOUT_MS || '20000', 10);
+const STUDENT_WATCHDOG_MS = TIMEOUT_MS + 60000; // provisioning deadline + slack for grade/destroy
 
 const WS_URL_BASE = BASE_URL.replace(/^http/, 'ws');
 
-console.error(`[bench] Config: students=${N_STUDENTS} base=${BASE_URL} template=${TEMPLATE} poll=${POLL_MS}ms timeout=${TIMEOUT_MS}ms`);
+console.error(`[bench] Config: students=${N_STUDENTS} base=${BASE_URL} template=${TEMPLATE} poll=${POLL_MS}ms timeout=${TIMEOUT_MS}ms req_timeout=${REQUEST_TIMEOUT_MS}ms`);
 
-// ── HTTP helper (no axios to keep deps minimal in the container) ──────────────
+// ── HTTP helper — NOW WITH A HARD TIMEOUT ──────────────────────────────────
 function request(method, path, body, token) {
   return new Promise((resolve, reject) => {
     const url = new URL(BASE_URL + path);
@@ -73,13 +57,18 @@ function request(method, path, body, token) {
         catch { resolve({ status: res.statusCode, body: data }); }
       });
     });
+
+    // NEW: destroy the request if it hangs, and reject instead of hanging forever.
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms: ${method} ${path}`));
+    });
     req.on('error', reject);
+
     if (payload) req.write(payload);
     req.end();
   });
 }
 
-// ── Percentile calculator ─────────────────────────────────────────────────────
 function percentile(sorted, p) {
   if (sorted.length === 0) return null;
   const idx = Math.ceil((p / 100) * sorted.length) - 1;
@@ -102,9 +91,7 @@ function stats(values) {
   };
 }
 
-// ── Pre-flight: create N student accounts (idempotent) ───────────────────────
 async function ensureStudents() {
-  // Login as admin to create student accounts
   const adminLogin = await request('POST', '/api/auth/login', { username: 'admin', password: 'admin123' });
   if (!adminLogin.body.token) throw new Error(`Admin login failed: ${JSON.stringify(adminLogin.body)}`);
   const adminToken = adminLogin.body.token;
@@ -113,15 +100,13 @@ async function ensureStudents() {
   for (let i = 1; i <= N_STUDENTS; i++) {
     const username = `bench_student_${i}`;
     const password = `benchpass_${i}`;
-    // Create account (ignore 409 = already exists)
     await request('POST', '/api/admin/users', { username, password, role: 'student' }, adminToken);
     accounts.push({ username, password });
   }
   return accounts;
 }
 
-// ── Per-student workflow ──────────────────────────────────────────────────────
-async function runStudent(account, idx) {
+async function runStudentInner(account, idx) {
   const result = {
     student: idx + 1,
     username: account.username,
@@ -136,17 +121,15 @@ async function runStudent(account, idx) {
     error: null,
   };
 
-  let token, labId, namespace;
+  let token, labId;
 
   try {
-    // 1. Login
     const t0 = Date.now();
     const loginResp = await request('POST', '/api/auth/login', { username: account.username, password: account.password });
     result.login_ms = Date.now() - t0;
     if (!loginResp.body.token) throw new Error(`Login failed: ${JSON.stringify(loginResp.body)}`);
     token = loginResp.body.token;
 
-    // 2. Destroy any existing lab first (cleanup from previous failed run)
     const existingResp = await request('GET', '/api/labs', null, token);
     if (existingResp.body && existingResp.body.length > 0) {
       for (const lab of existingResp.body) {
@@ -154,16 +137,14 @@ async function runStudent(account, idx) {
           await request('DELETE', `/api/labs/${lab.id}`, null, token);
         }
       }
-      await new Promise(r => setTimeout(r, 1000)); // brief pause for K8s cleanup
+      await new Promise(r => setTimeout(r, 1000));
     }
 
-    // 3. Create lab
     const t1 = Date.now();
     const createResp = await request('POST', '/api/labs', { template: TEMPLATE }, token);
     if (!createResp.body.id) throw new Error(`Lab creation failed: ${JSON.stringify(createResp.body)}`);
     labId = createResp.body.id;
 
-    // 4. Poll until ready
     let status = 'requesting';
     let polls = 0;
     const provisionDeadline = Date.now() + TIMEOUT_MS;
@@ -172,35 +153,29 @@ async function runStudent(account, idx) {
       polls++;
       const labResp = await request('GET', `/api/labs/${labId}`, null, token);
       status = labResp.body.status;
-      namespace = labResp.body.namespace;
     }
     result.provision_ms  = Date.now() - t1;
     result.poll_attempts = polls;
 
     if (status !== 'ready') throw new Error(`Lab did not become ready: final status=${status}`);
 
-    // Wait 12s for OSPF to converge
     await new Promise(r => setTimeout(r, 12000));
 
-    // 5. Grade
     const t2 = Date.now();
     const gradeResp = await request('POST', `/api/labs/${labId}/submit`, null, token);
     result.grade_ms    = Date.now() - t2;
     result.grade_score = gradeResp.body.score  ?? null;
     result.grade_max   = gradeResp.body.maxScore ?? null;
 
-    // 6. WebSocket RTT (send one command, measure time to first byte back)
     const wsUrl = `${WS_URL_BASE}/ws/console?labId=${labId}&netns=h1&isRouter=false&token=${token}`;
     result.ws_rtt_ms = await measureWsRtt(wsUrl);
 
-    // 7. Destroy
     const t3 = Date.now();
     await request('DELETE', `/api/labs/${labId}`, null, token);
     result.destroy_ms = Date.now() - t3;
 
   } catch (err) {
     result.error = err.message;
-    // Best-effort cleanup
     if (labId && token) {
       await request('DELETE', `/api/labs/${labId}`, null, token).catch(() => {});
     }
@@ -209,7 +184,27 @@ async function runStudent(account, idx) {
   return result;
 }
 
-// ── WebSocket RTT measurement ─────────────────────────────────────────────────
+// NEW: hard watchdog around the whole student run, independent of any
+// internal loop logic. Guarantees Promise.all can never hang forever.
+async function runStudent(account, idx) {
+  let timer;
+  const watchdog = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      resolve({
+        student: idx + 1, username: account.username,
+        login_ms: null, provision_ms: null, poll_attempts: null,
+        grade_ms: null, grade_score: null, grade_max: null,
+        ws_rtt_ms: null, destroy_ms: null,
+        error: `Student watchdog fired after ${STUDENT_WATCHDOG_MS}ms — something hung`,
+      });
+    }, STUDENT_WATCHDOG_MS);
+  });
+
+  const result = await Promise.race([runStudentInner(account, idx), watchdog]);
+  clearTimeout(timer);
+  return result;
+}
+
 function measureWsRtt(wsUrl) {
   return new Promise((resolve) => {
     const tConnect = Date.now();
@@ -217,7 +212,7 @@ function measureWsRtt(wsUrl) {
     const ws = new WebSocket(wsUrl);
     const timeout = setTimeout(() => {
       ws.terminate();
-      resolve(null); // timed out
+      resolve(null);
     }, 10000);
 
     ws.on('open', () => {
@@ -240,7 +235,6 @@ function measureWsRtt(wsUrl) {
   });
 }
 
-// ── Memory sampler: polls /health on the backend ──────────────────────────────
 async function sampleMemory() {
   try {
     const resp = await request('GET', '/health');
@@ -248,16 +242,14 @@ async function sampleMemory() {
   } catch { return null; }
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   console.error(`[bench] Ensuring ${N_STUDENTS} student accounts...`);
   const accounts = await ensureStudents();
 
-  // Memory before load
   const memBefore = await sampleMemory();
   console.error(`[bench] Heap before: ${memBefore ? Math.round(memBefore.heapUsed / 1024 / 1024) + ' MiB' : 'unknown'}`);
 
-  console.error(`[bench] Launching ${N_STUDENTS} concurrent students...`);
+  console.error(`[bench] Launching ${N_STUDENTS} concurrent students... (each capped at ${Math.round(STUDENT_WATCHDOG_MS/1000)}s)`);
   const tTotal = Date.now();
 
   const promises = accounts.map((acct, i) => runStudent(acct, i));
@@ -265,11 +257,9 @@ async function main() {
 
   const totalMs = Date.now() - tTotal;
 
-  // Memory at peak (immediately after all students complete)
   const memAfter = await sampleMemory();
   console.error(`[bench] Heap after:  ${memAfter  ? Math.round(memAfter.heapUsed  / 1024 / 1024) + ' MiB' : 'unknown'}`);
 
-  // ── Aggregate stats ─────────────────────────────────────────────────────────
   const ok      = results.filter(r => !r.error);
   const errors  = results.filter(r =>  r.error);
 
@@ -285,24 +275,15 @@ async function main() {
 
   const summary = {
     config: {
-      students:       N_STUDENTS,
-      template:       TEMPLATE,
-      base_url:       BASE_URL,
-      poll_interval_ms: POLL_MS,
-      timeout_ms:     TIMEOUT_MS,
-      timestamp:      new Date().toISOString(),
+      students: N_STUDENTS, template: TEMPLATE, base_url: BASE_URL,
+      poll_interval_ms: POLL_MS, timeout_ms: TIMEOUT_MS,
+      request_timeout_ms: REQUEST_TIMEOUT_MS,
+      timestamp: new Date().toISOString(),
     },
-    totals: {
-      wall_clock_ms:  totalMs,
-      successful:     ok.length,
-      failed:         errors.length,
-    },
+    totals: { wall_clock_ms: totalMs, successful: ok.length, failed: errors.length },
     latency_ms: {
-      login:     stats(loginMs),
-      provision: stats(provisionMs),
-      grade:     stats(gradeMs),
-      ws_rtt:    stats(wsRttMs),
-      destroy:   stats(destroyMs),
+      login: stats(loginMs), provision: stats(provisionMs), grade: stats(gradeMs),
+      ws_rtt: stats(wsRttMs), destroy: stats(destroyMs),
     },
     grading: {
       results: gradeScores,
@@ -319,7 +300,6 @@ async function main() {
     raw: results,
   };
 
-  // ── Pretty print to stderr ──────────────────────────────────────────────────
   console.error('\n══════════════════════════════════════════════════════════');
   console.error(` BENCHMARK COMPLETE — ${ok.length}/${N_STUDENTS} students succeeded`);
   console.error('══════════════════════════════════════════════════════════');
@@ -346,7 +326,6 @@ async function main() {
   }
   console.error('══════════════════════════════════════════════════════════\n');
 
-  // ── Emit JSON to stdout (for piping / CI) ────────────────────────────────
   console.log(JSON.stringify(summary, null, 2));
 }
 

@@ -1,0 +1,97 @@
+{
+  "config": {
+    "students": 1,
+    "template": "ospf",
+    "base_url": "http://localhost:4000",
+    "poll_interval_ms": 2000,
+    "timeout_ms": 150000,
+    "timestamp": "2026-09-30T05:30:15.834Z"
+  },
+  "totals": {
+    "wall_clock_ms": 35882,
+    "successful": 1,
+    "failed": 0
+  },
+  "latency_ms": {
+    "login": {
+      "n": 1,
+      "min": 101,
+      "max": 101,
+      "mean": 101,
+      "p50": 101,
+      "p90": 101,
+      "p95": 101,
+      "p99": 101
+    },
+    "provision": {
+      "n": 1,
+      "min": 18181,
+      "max": 18181,
+      "mean": 18181,
+      "p50": 18181,
+      "p90": 18181,
+      "p95": 18181,
+      "p99": 18181
+    },
+    "grade": {
+      "n": 1,
+      "min": 4006,
+      "max": 4006,
+      "mean": 4006,
+      "p50": 4006,
+      "p90": 4006,
+      "p95": 4006,
+      "p99": 4006
+    },
+    "ws_rtt": {
+      "n": 1,
+      "min": 159,
+      "max": 159,
+      "mean": 159,
+      "p50": 159,
+      "p90": 159,
+      "p95": 159,
+      "p99": 159
+    },
+    "destroy": {
+      "n": 1,
+      "min": 37,
+      "max": 37,
+      "mean": 37,
+      "p50": 37,
+      "p90": 37,
+      "p95": 37,
+      "p99": 37
+    }
+  },
+  "grading": {
+    "results": [
+      {
+        "score": 4,
+        "max": 4
+      }
+    ],
+    "perfect_4_4": 1,
+    "avg_score": "4.00"
+  },
+  "memory": {
+    "backend_heap_before_mb": 29,
+    "backend_heap_after_mb": 31
+  },
+  "errors": [],
+  "raw": [
+    {
+      "student": 1,
+      "username": "bench_student_1",
+      "login_ms": 101,
+      "provision_ms": 18181,
+      "poll_attempts": 9,
+      "grade_ms": 4006,
+      "grade_score": 4,
+      "grade_max": 4,
+      "ws_rtt_ms": 159,
+      "destroy_ms": 37,
+      "error": null
+    }
+  ]
+}

@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# scripts/run-benchmark.sh — Phase 7 benchmark runner
+# scripts/run-benchmark.sh — Phase 7 benchmark runner (PATCHED)
 #
-# Runs the benchmark client (N students, configurable), captures:
-#   - JSON results from benchmark.js
-#   - docker stats snapshot before and after
-#   - K8s pod count during run
-# Output: benchmark/results/run_<timestamp>/
+# Fix applied: was calling `node.exe` (a Windows binary) from inside WSL2
+# bash, which fails with "node: command not found". Now calls the Linux
+# `node` binary that ships with the benchmark/node_modules setup.
+#
+# Everything else is unchanged from the original script.
 
 set -euo pipefail
 
 STUDENTS="${1:-5}"
 TEMPLATE="${2:-ospf}"
-RESULTS_BASE="/mnt/d/Research_Paper/model/benchmark/results"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RESULTS_BASE="${REPO_ROOT}/benchmark/results"
 TS=$(date +%Y%m%dT%H%M%S)
 OUT_DIR="${RESULTS_BASE}/run_${TS}_n${STUDENTS}"
 
@@ -21,6 +22,13 @@ mkdir -p "${OUT_DIR}"
 
 log "Benchmark run: students=${STUDENTS} template=${TEMPLATE}"
 log "Output dir: ${OUT_DIR}"
+
+# ── Sanity: backend must be reachable before we start ─────────────────────────
+if ! curl -sf http://localhost:4000/health > /dev/null; then
+  log "ERROR: backend not reachable at http://localhost:4000/health"
+  log "       Run 'make up' (and 'make cluster' first) before benchmarking."
+  exit 1
+fi
 
 # ── Pre-run memory snapshot ───────────────────────────────────────────────────
 log "Snapshot: memory before"
@@ -32,14 +40,21 @@ cat "${OUT_DIR}/mem_before.txt"
 # ── Run the benchmark ─────────────────────────────────────────────────────────
 log "Starting benchmark with ${STUDENTS} concurrent students..."
 
-# Install deps inside benchmark dir if needed
-pushd /mnt/d/Research_Paper/model/benchmark > /dev/null
+pushd "${REPO_ROOT}/benchmark" > /dev/null
 if [[ ! -d node_modules ]]; then
   log "Installing benchmark dependencies..."
   npm install --silent
 fi
 
-  node.exe benchmark.js \
+if ! command -v node > /dev/null; then
+  log "ERROR: 'node' not found on PATH inside WSL2."
+  log "       Install Node.js inside WSL2 (not just on Windows):"
+  log "         curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -"
+  log "         sudo apt-get install -y nodejs"
+  exit 1
+fi
+
+node benchmark.js \
     --students "${STUDENTS}" \
     --template "${TEMPLATE}" \
     --base-url "http://localhost:4000" \
@@ -59,13 +74,10 @@ cat "${OUT_DIR}/mem_after.txt"
 
 # ── K8s namespace count ───────────────────────────────────────────────────────
 log "K8s: active lab namespaces"
-kubectl get namespaces --no-headers | grep '^lab-' | wc -l | tee "${OUT_DIR}/k8s_lab_ns.txt"
+kubectl get namespaces --no-headers | grep '^lab-' | wc -l | tee "${OUT_DIR}/k8s_lab_ns.txt" || echo 0 > "${OUT_DIR}/k8s_lab_ns.txt"
 
 # ── Print results path ────────────────────────────────────────────────────────
 log "Results written to: ${OUT_DIR}/"
-log "  summary.txt   — human-readable percentile table"
-log "  results.json  — full JSON for post-processing"
-log "  mem_before/after.txt — container memory snapshots"
 
 # ── Phase 7 acceptance check ──────────────────────────────────────────────────
 echo ""
@@ -80,14 +92,13 @@ if [[ -f "${OUT_DIR}/results.json" ]]; then
   echo "  Provision P95: ${P95_PROV} ms"
 
   if (( SUCCESSFUL >= 1 )); then
-    echo "  PHASE 7 PASSED ✓"
+    echo "  RUN OK ✓"
     exit 0
   else
-    echo "  PHASE 7 FAILED — no successful runs"
+    echo "  RUN FAILED — no successful students"
     exit 1
   fi
-  echo "═══════════════════════════════════════════════════"
 else
-  echo "  PHASE 7 FAILED — no results.json produced"
+  echo "  RUN FAILED — no results.json produced"
   exit 1
 fi

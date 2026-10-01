@@ -1,0 +1,8 @@
+NAME                   MEM USAGE / LIMIT    MEM %     CPU %
+model-frontend-1       8.883MiB / 64MiB     13.88%    0.00%
+model-backend-1        58.45MiB / 300MiB    19.48%    5.47%
+model-postgres-1       35.65MiB / 128MiB    27.85%    0.01%
+model-redis-1          5.953MiB / 64MiB     9.30%     0.13%
+model-kafka-1          476.9MiB / 600MiB    79.48%    1.22%
+model-prometheus-1     44.54MiB / 256MiB    17.40%    0.00%
+netlab-control-plane   976.6MiB / 5.66GiB   16.85%    25.40%
