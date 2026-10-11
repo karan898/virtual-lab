@@ -1,0 +1,21 @@
+[bench] Config: students=20 base=http://localhost:4000 template=ospf poll=2000ms timeout=150000ms req_timeout=20000ms
+[bench] Ensuring 20 student accounts...
+[bench] Heap before: 33 MiB
+[bench] Launching 20 concurrent students... (each capped at 210s)
+[bench] Heap after:  37 MiB
+
+══════════════════════════════════════════════════════════
+ BENCHMARK COMPLETE — 20/20 students succeeded
+══════════════════════════════════════════════════════════
+  Wall clock (all 20 concurrent): 91.5s
+
+  login          n=20  min=605  p50=1298  p90=1516  p95=1519  p99=1521  max=1521  mean=1264  (ms)
+  provision      n=20  min=68827  p50=73079  p90=73421  p95=73523  p99=73959  max=73959  mean=71845  (ms)
+  grade          n=20  min=2814  p50=2995  p90=3538  p95=3565  p99=3587  max=3587  mean=3124  (ms)
+  ws_rtt         n=20  min=85  p50=140  p90=298  p95=302  p99=416  max=416  mean=180  (ms)
+  destroy        n=20  min=29  p50=45  p90=176  p95=187  p99=190  max=190  mean=82  (ms)
+
+  Grading: 20/20 scored 4/4.  avg_score=4.00
+  Backend heap: 33 MiB → 37 MiB
+══════════════════════════════════════════════════════════
+

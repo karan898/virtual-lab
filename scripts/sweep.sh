@@ -10,7 +10,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LEVELS=(5 10)     # add 20 here only after 1/5/10 succeed comfortably
+LEVELS=(20)     # add 20 here only after 1/5/10 succeed comfortably
 REPS=3
 TEMPLATE="ospf"
 COOLDOWN_SEC=60      # wait between runs
